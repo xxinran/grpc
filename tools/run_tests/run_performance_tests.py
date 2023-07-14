@@ -40,7 +40,7 @@ import python_utils.report_utils as report_utils
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), '../..'))
 os.chdir(_ROOT)
 
-_REMOTE_HOST_USERNAME = 'jenkins'
+_REMOTE_HOST_USERNAME = 'ubuntu'
 
 _SCENARIO_TIMEOUT = 3 * 60
 _WORKER_TIMEOUT = 3 * 60
@@ -586,12 +586,18 @@ def main():
         default='',
         type=str,
         help='Use a username that isn\'t "Jenkins" to SSH into remote workers.')
+    argp.add_argument(
+        '--cores',
+        default='112',
+        type=int,
+        help='pin 0-(core-1) to server and xxx-(xxx+core-1) to client, xxx is the first cpu core on numa 1.')
 
     args = argp.parse_args()
 
     global _REMOTE_HOST_USERNAME
     if args.remote_host_username:
         _REMOTE_HOST_USERNAME = args.remote_host_username
+        print(_REMOTE_HOST_USERNAME)
 
     languages = set(
         scenario_config.LANGUAGES[l] for l in itertools.chain.from_iterable(
@@ -634,8 +640,12 @@ def main():
 
     # get list of worker addresses for each language.
     workers_by_lang = dict([(str(language), []) for language in languages])
+    core = args.cores
+    i = 0
     for job in qpsworker_jobs:
+        job._spec.cmdline = (job._spec.cmdline + ['%i' % core]  + ['%i' % i] )
         workers_by_lang[str(job.language)].append(job)
+        i = i + 1
 
     scenarios = create_scenarios(languages,
                                  workers_by_lang=workers_by_lang,
